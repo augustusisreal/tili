@@ -121,8 +121,17 @@ export interface Tase {
   siirtovelat: number;
   muutVelat: number;
   vastattavaaYhteensa: number;
+  /** Aina true moottorin jälkeen — senttitasapaino. */
   tasapainossa: boolean;
+  /** Ennen tasauserää: Vastaavaa − Vastattavaa (sentteihin pyöristettynä). */
   erotus: number;
+  /**
+   * Automaattinen tasauserä, jos wizard-data ei vielä täsmää.
+   * Positiivinen arvo kohteessa `muutVelat` tai `muutSaamiset`.
+   */
+  tasausEra: number;
+  tasausKohde: "muutSaamiset" | "muutVelat" | null;
+  tasausSelite: string | null;
 }
 
 export interface LaskelmaTulos {
@@ -131,6 +140,13 @@ export interface LaskelmaTulos {
   taseKuluva: Tase;
   taseEdellinen: Tase;
   varoitukset: string[];
+  /** Moottorin käyttämä syöte (jäljitettävyys). */
+  inputYhteenveto?: {
+    nollatoiminta: boolean;
+    poistotLasketut: number;
+    menojannosLoppu: number;
+    pankkiYhteensa: number;
+  };
 }
 
 export interface Liitetiedot {
