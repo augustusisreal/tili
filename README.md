@@ -27,7 +27,7 @@ Avaa [http://localhost:3000](http://localhost:3000).
 Kopioi `.env.example` → `.env.local` ja aseta vähintään yksi:
 
 - `OPENAI_API_KEY` (oletusmalli `gpt-4o-mini`)
-- tai `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_API_KEY` (oletus `gemini-2.0-flash`)
+- tai `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_API_KEY` (oletus `gemini-2.5-flash`)
 
 ## Skriptit
 
