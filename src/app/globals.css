@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+:root,
+html[data-theme="light"] {
+  --bg: #f4f6f8;
+  --fg: #0f1419;
+  --muted: #5c6b7a;
+  --border: #d8e0e8;
+  --surface: #ffffff;
+  --surface-2: #f0f3f6;
+  --surface-hover: #e8eef3;
+  --sidebar: #ffffff;
+  --header: #ffffffcc;
+  --input-bg: #ffffff;
+  --track: #e2e8ee;
+  --accent: #0d7a6f;
+  --accent-soft: #d8f0ec;
+  --accent-ring: #0d7a6f33;
+  --status-gray: #8b97a3;
+  --status-yellow: #b8860b;
+  --status-blue: #2b6cb0;
+  --status-purple: #6b5b95;
+  --status-green: #1a7f4b;
+  --shadow-sm: 0 1px 2px rgba(15, 20, 25, 0.04);
+}
+
+html[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --bg: #0b0e11;
+  --fg: #e8eef4;
+  --muted: #8b9aab;
+  --border: #1e2630;
+  --surface: #12171d;
+  --surface-2: #161c24;
+  --surface-hover: #1a222c;
+  --sidebar: #0e1217;
+  --header: #0e1217cc;
+  --input-bg: #0b0e11;
+  --track: #1e2630;
+  --accent: #2dd4bf;
+  --accent-soft: #134e4a66;
+  --accent-ring: #2dd4bf33;
+  --status-gray: #6b7785;
+  --status-yellow: #e6b84a;
+  --status-blue: #5b9fd4;
+  --status-purple: #a78bfa;
+  --status-green: #34d399;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 100% -20%, color-mix(in oklab, var(--accent) 18%, transparent), transparent),
+    radial-gradient(ellipse 60% 40% at -10% 100%, color-mix(in oklab, var(--accent) 10%, transparent), transparent);
+  background-attachment: fixed;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-step-in {
+  animation: step-in 0.35s ease-out both;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+@media print {
+  aside,
+  header,
+  .border-t {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+  }
+}
