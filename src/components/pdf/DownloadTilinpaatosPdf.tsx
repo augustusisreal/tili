@@ -7,14 +7,18 @@ import {
   TilinpaatosDocument,
   type TilinpaatosPdfProps,
 } from "@/components/pdf/TilinpaatosDocument";
+import type { LaskelmaTulos } from "@/lib/types";
 import { btnPrimary } from "@/lib/ui-classes";
 
 type Props = TilinpaatosPdfProps & {
   onGenerated?: () => void;
+  /** Aja laskentamoottori juuri ennen PDF:ää — palauttaa tuoreen laskelman. */
+  refreshLaskelma?: () => LaskelmaTulos | null;
 };
 
 export function DownloadTilinpaatosPdf({
   onGenerated,
+  refreshLaskelma,
   ...docProps
 }: Props) {
   const [busy, setBusy] = useState(false);
@@ -29,7 +33,20 @@ export function DownloadTilinpaatosPdf({
     setBusy(true);
     setError(null);
     try {
-      const blob = await pdf(<TilinpaatosDocument {...docProps} />).toBlob();
+      const fresh = refreshLaskelma?.() ?? docProps.laskelma;
+      if (!fresh) {
+        throw new Error("Laskelma puuttuu — aja vaihe 9 ensin.");
+      }
+      if (
+        Math.abs(fresh.taseKuluva.vastaavaaYhteensa - fresh.taseKuluva.vastattavaaYhteensa) >=
+        0.005
+      ) {
+        throw new Error("Tase ei ole tasapainossa — PDF:ää ei muodosteta.");
+      }
+
+      const blob = await pdf(
+        <TilinpaatosDocument {...docProps} laskelma={fresh} />,
+      ).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const safeName = (docProps.yritys.nimi || "tilinpaatos")
@@ -44,9 +61,7 @@ export function DownloadTilinpaatosPdf({
       onGenerated?.();
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "PDF:n muodostus epäonnistui.",
+        e instanceof Error ? e.message : "PDF:n muodostus epäonnistui.",
       );
     } finally {
       setBusy(false);
@@ -54,6 +69,8 @@ export function DownloadTilinpaatosPdf({
   }
 
   if (!ready) return null;
+
+  const bs = docProps.laskelma.taseKuluva;
 
   return (
     <div className="space-y-2">
@@ -74,7 +91,9 @@ export function DownloadTilinpaatosPdf({
         <p className="text-xs text-[var(--status-yellow)]">{error}</p>
       ) : (
         <p className="text-xs text-[var(--muted)]">
-          Sisältää kansilehden, tuloslaskelman, taseen ja allekirjoitukset.
+          Kansilehti · Tuloslaskelma · Tase · Allekirjoitukset — moottorin
+          luvuista (Vastaavaa {bs.vastaavaaYhteensa.toFixed(2)} € =
+          Vastattavaa {bs.vastattavaaYhteensa.toFixed(2)} €).
         </p>
       )}
     </div>

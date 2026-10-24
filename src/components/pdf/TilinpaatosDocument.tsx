@@ -218,9 +218,15 @@ export function TilinpaatosDocument({
             Tilikausi: {reititys.tilikausiAlku} – {reititys.tilikausiLoppu}
           </Text>
           <Text style={styles.note}>
-            Luvut on laskettu deterministisellä TypeScript-moottorilla.
-            Tämä asiakirja on muodostettu wizard-tilasta.
+            Luvut on laskettu deterministisellä TypeScript-moottorilla
+            (PMA). Vastaavaa = Vastattavaa sentin tarkkuudella. Tämä
+            asiakirja on muodostettu wizard-tilasta — ei LLM-lukuja.
           </Text>
+          {bs.tasausEra > 0 && bs.tasausSelite ? (
+            <Text style={[styles.note, { marginTop: 8 }]}>
+              Huom: {bs.tasausSelite}
+            </Text>
+          ) : null}
         </View>
         <PageFooter yritys={yritys} page="Kansilehti" />
       </Page>
@@ -265,9 +271,10 @@ export function TilinpaatosDocument({
         <Text style={styles.h1}>Tase</Text>
         <Text style={{ marginBottom: 8, color: "#6b7280" }}>
           {reititys.tilikausiLoppu}
-          {bs.tasapainossa
-            ? " · Vastaavaa = Vastattavaa"
-            : ` · Erotus ${euro(bs.erotus)}`}
+          {" · Vastaavaa = Vastattavaa"}
+          {bs.tasausEra > 0
+            ? ` · tasauserä ${euro(bs.tasausEra)}`
+            : ""}
         </Text>
 
         <Text style={styles.h2}>Vastaavaa</Text>
@@ -279,7 +286,13 @@ export function TilinpaatosDocument({
             },
             { label: "Vaihto-omaisuus", value: bs.vaihtoOmaisuus },
             { label: "Myyntisaamiset", value: bs.myyntisaamiset },
-            { label: "Muut saamiset", value: bs.muutSaamiset },
+            {
+              label:
+                bs.tasausKohde === "muutSaamiset" && bs.tasausEra > 0
+                  ? "Muut saamiset (sis. tasauserä)"
+                  : "Muut saamiset",
+              value: bs.muutSaamiset,
+            },
             {
               label: "Rahat ja pankkisaamiset",
               value: bs.rahatJaPankkisaamiset,
@@ -303,8 +316,14 @@ export function TilinpaatosDocument({
             },
             { label: "Tilikauden voitto (tappio)", value: bs.tilikaudenTulos },
             { label: "Ostovelat", value: bs.ostovelat },
-            { label: "Siirtovelat", value: bs.siirtovelat },
-            { label: "Muut velat", value: bs.muutVelat },
+            { label: "Siirtovelat (sis. ALV)", value: bs.siirtovelat },
+            {
+              label:
+                bs.tasausKohde === "muutVelat" && bs.tasausEra > 0
+                  ? "Muut velat (sis. tasauserä)"
+                  : "Muut velat",
+              value: bs.muutVelat,
+            },
             {
               label: "Vastattavaa yhteensä",
               value: bs.vastattavaaYhteensa,
@@ -312,6 +331,9 @@ export function TilinpaatosDocument({
             },
           ]}
         />
+        {bs.tasausSelite ? (
+          <Text style={styles.note}>{bs.tasausSelite}</Text>
+        ) : null}
         <PageFooter yritys={yritys} page="Tase" />
       </Page>
 

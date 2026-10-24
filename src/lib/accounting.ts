@@ -1,6 +1,10 @@
 /**
  * Deterministinen PMA-laskentamoottori.
  * Kaikki luvut TypeScript-aritmetiikasta — ei LLM-arvauksia.
+ *
+ * Taseen turvallisuussääntö: Vastaavaa === Vastattavaa sentin tarkkuudella.
+ * Jos wizard-data ei täsmää, erotus kirjataan dokumentoituun tasauserään
+ * (`muutSaamiset` tai `muutVelat`) — ei piiloteta.
  */
 import type {
   Kayttoomaisuuserä,
@@ -8,6 +12,7 @@ import type {
   LaskelmaTulos,
   OmaPaaoma,
   Pankkitili,
+  Reititys,
   SaamisetVelat,
   Tase,
   Tuloslaskelma,
@@ -17,9 +22,19 @@ import type {
 const PIENHANKINTA_RAJA = 1200;
 const CENT = 100;
 
+/** Euro → sentit (kokonaisluku). */
+export function toCents(n: number): number {
+  return Math.round((n + Number.EPSILON) * CENT);
+}
+
+/** Sentit → euro. */
+export function fromCents(c: number): number {
+  return c / CENT;
+}
+
 /** Pyöristä senteiksi (pankkipyöristys lähimpään). */
 export function roundEuro(n: number): number {
-  return Math.round((n + Number.EPSILON) * CENT) / CENT;
+  return fromCents(toCents(n));
 }
 
 export function laskePoistot(
@@ -27,8 +42,8 @@ export function laskePoistot(
   poistoProsentti: number,
 ): { poistotYhteensa: number; menojannosLoppu: number; varoitukset: string[] } {
   const varoitukset: string[] = [];
-  let poistotYhteensa = 0;
-  let menojannosLoppu = 0;
+  let poistotC = 0;
+  let menojannosC = 0;
 
   for (const erä of erät) {
     if (erä.hankintahinta > 0 && erä.hankintahinta < PIENHANKINTA_RAJA && !erä.onPienhankinta) {
@@ -37,16 +52,20 @@ export function laskePoistot(
       );
     }
     if (erä.onPienhankinta) {
-      poistotYhteensa = roundEuro(poistotYhteensa + erä.hankintahinta);
+      poistotC += toCents(erä.hankintahinta);
       continue;
     }
     const pohja = erä.menojannosAlku > 0 ? erä.menojannosAlku : erä.hankintahinta;
     const poisto = roundEuro(pohja * (poistoProsentti / 100));
-    poistotYhteensa = roundEuro(poistotYhteensa + poisto);
-    menojannosLoppu = roundEuro(menojannosLoppu + (pohja - poisto));
+    poistotC += toCents(poisto);
+    menojannosC += toCents(pohja) - toCents(poisto);
   }
 
-  return { poistotYhteensa, menojannosLoppu, varoitukset };
+  return {
+    poistotYhteensa: fromCents(poistotC),
+    menojannosLoppu: fromCents(menojannosC),
+    varoitukset,
+  };
 }
 
 function emptyTulos(): Tuloslaskelma {
@@ -65,6 +84,30 @@ function emptyTulos(): Tuloslaskelma {
   };
 }
 
+function emptyTase(): Tase {
+  return {
+    aineellisetHyodykkeet: 0,
+    vaihtoOmaisuus: 0,
+    myyntisaamiset: 0,
+    muutSaamiset: 0,
+    rahatJaPankkisaamiset: 0,
+    vastaavaaYhteensa: 0,
+    osakepaaoma: 0,
+    svop: 0,
+    edellistenTilienVoitto: 0,
+    tilikaudenTulos: 0,
+    ostovelat: 0,
+    siirtovelat: 0,
+    muutVelat: 0,
+    vastattavaaYhteensa: 0,
+    tasapainossa: true,
+    erotus: 0,
+    tasausEra: 0,
+    tasausKohde: null,
+    tasausSelite: null,
+  };
+}
+
 function buildTulos(
   kp: KirjanpitoRaportit,
   poistotOverride: number,
@@ -73,9 +116,10 @@ function buildTulos(
 ): Tuloslaskelma {
   if (nollatoiminta) {
     const t = emptyTulos();
-    t.verot = roundEuro(verot.ennakkoverot > 0 ? -verot.ennakkoverot : 0);
+    // 0-toiminta: ei liiketoimintaa; ennakkoverojen palautus ei inventoida tulokseen.
+    t.verot = 0;
     t.tulosEnnenVeroja = 0;
-    t.tilikaudenTulos = roundEuro(t.verot);
+    t.tilikaudenTulos = 0;
     return t;
   }
 
@@ -92,7 +136,18 @@ function buildTulos(
   const rahoitustuotot = roundEuro(kp.rahoitustuotot);
   const rahoituskulut = roundEuro(kp.rahoituskulut);
   const tulosEnnenVeroja = roundEuro(liiketulos + rahoitustuotot - rahoituskulut);
-  const verotSumma = roundEuro(kp.verot > 0 ? kp.verot : Math.max(0, tulosEnnenVeroja) * 0.2);
+
+  // Verot: käytä kirjanpidon veroa, muuten 20 % yhteisövero positiivisesta tuloksesta.
+  // Vähennyskelvottomat eivät muuta kirjanpidon tulosta tässä PMA-näkymässä (ne menevät 6B:lle).
+  let verotSumma: number;
+  if (kp.verot !== 0) {
+    verotSumma = roundEuro(kp.verot);
+  } else if (tulosEnnenVeroja > 0) {
+    verotSumma = roundEuro(tulosEnnenVeroja * 0.2);
+  } else {
+    verotSumma = 0;
+  }
+
   const tilikaudenTulos = roundEuro(tulosEnnenVeroja - verotSumma);
 
   return {
@@ -117,62 +172,100 @@ function buildTase(args: {
   pankit: Pankkitili[];
   omaPaaoma: OmaPaaoma;
   tilikaudenTulos: number;
+  verot: VerotAlvPalkat;
   vaihtoOmaisuusEdellinen?: number;
-}): Tase {
-  const rahat = roundEuro(args.pankit.reduce((s, p) => s + p.loppusaldo, 0));
-  const aineelliset = roundEuro(args.menojannos);
-  const vaihtoOmaisuus = args.onVarastoa ? roundEuro(args.vaihtoOmaisuusEdellinen ?? 0) : 0;
-  const myyntisaamiset = roundEuro(args.saamiset.myyntisaamiset);
-  const muutSaamiset = roundEuro(
-    args.saamiset.siirtosaamiset + args.saamiset.muutSaamiset,
-  );
+}): { tase: Tase; varoitukset: string[] } {
+  const varoitukset: string[] = [];
 
-  const vastaavaaYhteensa = roundEuro(
-    aineelliset + vaihtoOmaisuus + myyntisaamiset + muutSaamiset + rahat,
-  );
+  const aineellisetC = toCents(args.menojannos);
+  const vaihtoC = args.onVarastoa
+    ? toCents(args.vaihtoOmaisuusEdellinen ?? 0)
+    : 0;
+  const myyntiC = toCents(args.saamiset.myyntisaamiset);
+  // Ennakkoverot = saaminen Verohallinnolta (siirtosaaminen)
+  const muutSaamisetC =
+    toCents(args.saamiset.siirtosaamiset) +
+    toCents(args.saamiset.muutSaamiset) +
+    toCents(args.verot.ennakkoverot);
+  const rahatC = args.pankit.reduce((s, p) => s + toCents(p.loppusaldo), 0);
 
-  const osakepaaoma = roundEuro(args.omaPaaoma.osakepaaoma);
-  const svop = roundEuro(args.omaPaaoma.svop);
-  const edellisten = roundEuro(
+  let vastaavaaC =
+    aineellisetC + vaihtoC + myyntiC + muutSaamisetC + rahatC;
+
+  const osakeC = toCents(args.omaPaaoma.osakepaaoma);
+  const svopC = toCents(args.omaPaaoma.svop);
+  const edellistenC = toCents(
     args.omaPaaoma.edellinenVoittoTappio - args.omaPaaoma.osingot,
   );
-  const tilikaudenTulos = roundEuro(args.tilikaudenTulos);
-  const ostovelat = roundEuro(args.saamiset.ostovelat);
-  const siirtovelat = roundEuro(args.saamiset.siirtovelat);
-  const muutVelat = roundEuro(args.saamiset.muutVelat);
+  const tulosC = toCents(args.tilikaudenTulos);
+  const ostoC = toCents(args.saamiset.ostovelat);
+  // ALV-maksettava + kirjatut siirtovelat
+  const siirtoVelatC =
+    toCents(args.saamiset.siirtovelat) + toCents(args.verot.alvMaksettava);
+  let muutVelatC = toCents(args.saamiset.muutVelat);
 
-  let vastattavaaYhteensa = roundEuro(
-    osakepaaoma +
-      svop +
-      edellisten +
-      tilikaudenTulos +
-      ostovelat +
-      siirtovelat +
-      muutVelat,
-  );
+  let vastattavaaC =
+    osakeC + svopC + edellistenC + tulosC + ostoC + siirtoVelatC + muutVelatC;
 
-  // Jos tase ei täsmää (puuttuvaa dataa), erotus näkyy — ei peitetä automaattisesti.
-  const erotus = roundEuro(vastaavaaYhteensa - vastattavaaYhteensa);
-  const tasapainossa = Math.abs(erotus) < 0.005;
+  const erotusC = vastaavaaC - vastattavaaC;
+  let tasausEra = 0;
+  let tasausKohde: Tase["tasausKohde"] = null;
+  let tasausSelite: string | null = null;
+  let muutSaamisetFinalC = muutSaamisetC;
 
-  return {
-    aineellisetHyodykkeet: aineelliset,
-    vaihtoOmaisuus,
-    myyntisaamiset,
-    muutSaamiset,
-    rahatJaPankkisaamiset: rahat,
-    vastaavaaYhteensa,
-    osakepaaoma,
-    svop,
-    edellistenTilienVoitto: edellisten,
-    tilikaudenTulos,
-    ostovelat,
-    siirtovelat,
-    muutVelat,
-    vastattavaaYhteensa,
-    tasapainossa,
-    erotus,
+  if (erotusC !== 0) {
+    // Deterministinen tasauserä: dokumentoitu riville, jotta Vastaavaa === Vastattavaa.
+    if (erotusC > 0) {
+      // Liikaa vastaavaa → tasaus vastattaviin (muut velat)
+      tasausEra = fromCents(erotusC);
+      tasausKohde = "muutVelat";
+      tasausSelite =
+        "Automaattinen tasauserä (muut velat): wizard-datan Vastaavaa > Vastattavaa. Täydennä saamiset/velat poistaaksesi erän.";
+      muutVelatC += erotusC;
+      vastattavaaC += erotusC;
+    } else {
+      // Liikaa vastattavaa → tasaus vastaaviin (muut saamiset)
+      const abs = -erotusC;
+      tasausEra = fromCents(abs);
+      tasausKohde = "muutSaamiset";
+      tasausSelite =
+        "Automaattinen tasauserä (muut saamiset): wizard-datan Vastattavaa > Vastaavaa. Täydennä saamiset/velat poistaaksesi erän.";
+      muutSaamisetFinalC += abs;
+      vastaavaaC += abs;
+    }
+    varoitukset.push(tasausSelite);
+  }
+
+  // Turvallisuustarkistus sentteinä
+  if (vastaavaaC !== vastattavaaC) {
+    throw new Error(
+      `Taselaskenta epäonnistui: Vastaavaa ${vastaavaaC} ≠ Vastattavaa ${vastattavaaC} senttiä.`,
+    );
+  }
+
+  const tase: Tase = {
+    aineellisetHyodykkeet: fromCents(aineellisetC),
+    vaihtoOmaisuus: fromCents(vaihtoC),
+    myyntisaamiset: fromCents(myyntiC),
+    muutSaamiset: fromCents(muutSaamisetFinalC),
+    rahatJaPankkisaamiset: fromCents(rahatC),
+    vastaavaaYhteensa: fromCents(vastaavaaC),
+    osakepaaoma: fromCents(osakeC),
+    svop: fromCents(svopC),
+    edellistenTilienVoitto: fromCents(edellistenC),
+    tilikaudenTulos: fromCents(tulosC),
+    ostovelat: fromCents(ostoC),
+    siirtovelat: fromCents(siirtoVelatC),
+    muutVelat: fromCents(muutVelatC),
+    vastattavaaYhteensa: fromCents(vastattavaaC),
+    tasapainossa: true,
+    erotus: fromCents(erotusC),
+    tasausEra,
+    tasausKohde,
+    tasausSelite,
   };
+
+  return { tase, varoitukset };
 }
 
 export interface LaskentaInput {
@@ -189,6 +282,31 @@ export interface LaskentaInput {
   edellinen?: {
     tulos: Partial<Tuloslaskelma>;
     tase: Partial<Tase>;
+  };
+}
+
+/** Rakenna moottorin syöte wizard-tilasta (vaiheet 3–8). */
+export function buildLaskentaInputFromWizard(state: {
+  reititys: Reititys;
+  kirjanpito: KirjanpitoRaportit;
+  kayttoomaisuus: Kayttoomaisuuserä[];
+  poistoProsentti: number;
+  saamisetVelat: SaamisetVelat;
+  pankit: Pankkitili[];
+  omaPaaoma: OmaPaaoma;
+  verot: VerotAlvPalkat;
+}): LaskentaInput {
+  return {
+    nollatoiminta:
+      state.reititys.onNollatoiminta === true || state.kirjanpito.nollatoiminta,
+    onVarastoa: state.reititys.onVarastoa === true,
+    kirjanpito: state.kirjanpito,
+    kayttoomaisuus: state.kayttoomaisuus,
+    poistoProsentti: state.poistoProsentti,
+    saamisetVelat: state.saamisetVelat,
+    pankit: state.pankit,
+    omaPaaoma: state.omaPaaoma,
+    verot: state.verot,
   };
 }
 
@@ -210,7 +328,11 @@ export function ajaLaskentamoottori(input: LaskentaInput): LaskelmaTulos {
     }
   }
 
-  if (input.omaPaaoma.osakepaaoma + input.omaPaaoma.svop + input.omaPaaoma.edellinenVoittoTappio < 0) {
+  const omaPaaomaSumma =
+    input.omaPaaoma.osakepaaoma +
+    input.omaPaaoma.svop +
+    input.omaPaaoma.edellinenVoittoTappio;
+  if (omaPaaomaSumma < 0) {
     varoitukset.push(
       "Oma pääoma on negatiivinen — tarkista OYL 20:23 § (rekisteröimismenettely) ja TVL 53a §.",
     );
@@ -228,40 +350,33 @@ export function ajaLaskentamoottori(input: LaskentaInput): LaskelmaTulos {
     ...input.edellinen?.tulos,
   };
 
-  const taseKuluva = buildTase({
+  const { tase: taseKuluva, varoitukset: taseVar } = buildTase({
     menojannos: input.nollatoiminta ? 0 : menojannosLoppu,
     onVarastoa: input.onVarastoa,
     saamiset: input.saamisetVelat,
     pankit: input.pankit,
     omaPaaoma: { ...input.omaPaaoma, tilikaudenTulos: kuluva.tilikaudenTulos },
     tilikaudenTulos: kuluva.tilikaudenTulos,
+    verot: input.verot,
   });
-
-  if (!taseKuluva.tasapainossa) {
-    varoitukset.push(
-      `Tase ei täsmää: Vastaavaa − Vastattavaa = ${taseKuluva.erotus.toFixed(2)} €. Täydennä saamiset/velat tai omaa pääomaa.`,
-    );
-  }
+  varoitukset.push(...taseVar);
 
   const taseEdellinen: Tase = {
-    aineellisetHyodykkeet: 0,
-    vaihtoOmaisuus: 0,
-    myyntisaamiset: 0,
-    muutSaamiset: 0,
-    rahatJaPankkisaamiset: 0,
-    vastaavaaYhteensa: 0,
-    osakepaaoma: input.omaPaaoma.osakepaaoma,
-    svop: input.omaPaaoma.svop,
-    edellistenTilienVoitto: 0,
+    ...emptyTase(),
+    osakepaaoma: roundEuro(input.omaPaaoma.osakepaaoma),
+    svop: roundEuro(input.omaPaaoma.svop),
     tilikaudenTulos: edellinenTulos.tilikaudenTulos,
-    ostovelat: 0,
-    siirtovelat: 0,
-    muutVelat: 0,
-    vastattavaaYhteensa: 0,
+    ...input.edellinen?.tase,
     tasapainossa: true,
     erotus: 0,
-    ...input.edellinen?.tase,
+    tasausEra: input.edellinen?.tase?.tasausEra ?? 0,
+    tasausKohde: input.edellinen?.tase?.tasausKohde ?? null,
+    tasausSelite: input.edellinen?.tase?.tasausSelite ?? null,
   };
+
+  const pankkiYhteensa = roundEuro(
+    input.pankit.reduce((s, p) => s + p.loppusaldo, 0),
+  );
 
   return {
     kuluva,
@@ -269,11 +384,21 @@ export function ajaLaskentamoottori(input: LaskentaInput): LaskelmaTulos {
     taseKuluva,
     taseEdellinen,
     varoitukset,
+    inputYhteenveto: {
+      nollatoiminta: input.nollatoiminta,
+      poistotLasketut: poistotYhteensa,
+      menojannosLoppu,
+      pankkiYhteensa,
+    },
   };
 }
 
 /** Mapita laskelma Verohallinnon 6B-kenttiin (ydinjoukko). */
-export function mapita6B(laskelma: LaskelmaTulos, omaPaaoma: OmaPaaoma, verot: VerotAlvPalkat) {
+export function mapita6B(
+  laskelma: LaskelmaTulos,
+  omaPaaoma: OmaPaaoma,
+  verot: VerotAlvPalkat,
+) {
   const t = laskelma.kuluva;
   const bs = laskelma.taseKuluva;
   return [
@@ -345,10 +470,13 @@ export function mapita6B(laskelma: LaskelmaTulos, omaPaaoma: OmaPaaoma, verot: V
       koodi: "900",
       otsikko: "OYL/TVL-varoitus (oma pääoma)",
       arvo:
-        omaPaaoma.osakepaaoma + omaPaaoma.svop + omaPaaoma.edellinenVoittoTappio + t.tilikaudenTulos,
+        omaPaaoma.osakepaaoma +
+        omaPaaoma.svop +
+        omaPaaoma.edellinenVoittoTappio +
+        t.tilikaudenTulos,
       lahde: "Oma pääoma",
     },
   ];
 }
 
-export { PIENHANKINTA_RAJA };
+export { PIENHANKINTA_RAJA, emptyTulos, emptyTase };

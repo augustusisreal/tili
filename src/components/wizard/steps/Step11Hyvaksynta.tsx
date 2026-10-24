@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { FileText } from "lucide-react";
 import { Checkbox, Field, TextInput } from "@/components/ui/FormFields";
@@ -24,13 +25,18 @@ const DownloadTilinpaatosPdf = dynamic(
 export function Step11Hyvaksynta() {
   const h = useWizardStore((s) => s.hyvaksynta);
   const patch = useWizardStore((s) => s.patchHyvaksynta);
-  const laskelma = useWizardStore((s) => s.laskelma);
   const yritys = useWizardStore((s) => s.yritys);
   const reititys = useWizardStore((s) => s.reititys);
   const liitetiedot = useWizardStore((s) => s.liitetiedot);
   const run = useWizardStore((s) => s.runEngine);
+  const fresh = useWizardStore((s) => s.laskelma);
 
-  if (!laskelma) {
+  // Varmista tuore moottorilaskelma kun vaihe avataan.
+  useEffect(() => {
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
+  if (!fresh) {
     return (
       <StepChrome>
         <p className="text-sm text-[var(--muted)]">
@@ -47,15 +53,15 @@ export function Step11Hyvaksynta() {
     );
   }
 
-  const t = laskelma.kuluva;
-  const bs = laskelma.taseKuluva;
+  const t = fresh.kuluva;
+  const bs = fresh.taseKuluva;
 
   return (
     <StepChrome
       checklist={[
-        "Ristiintarkistus: tulos ↔ tase ↔ 6B",
+        "Ristiintarkistus: tulos ↔ tase (Vastaavaa = Vastattavaa)",
         "Allekirjoitus ja hyväksyntä",
-        "Lataa virallinen tilinpäätös-PDF (kansilehti, tulos, tase, allekirjoitukset)",
+        "Lataa PDF moottorin luvuilla (kansilehti, tulos, tase, allekirjoitukset)",
       ]}
     >
       <div className={`${cardRow} space-y-3`}>
@@ -63,7 +69,7 @@ export function Step11Hyvaksynta() {
           checked={h.ristiintarkistusOk}
           onChange={(v) => patch({ ristiintarkistusOk: v })}
           label={`Ristiintarkistus OK (tase ${
-            bs.tasapainossa ? "täsmää" : "ei täsmää"
+            bs.tasapainossa ? "täsmää sentilleen" : "ei täsmää"
           })`}
         />
         <Checkbox
@@ -95,15 +101,20 @@ export function Step11Hyvaksynta() {
           <h3 className="text-sm font-semibold">Tilinpäätös-PDF</h3>
         </div>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Muodostetaan wizard-tilan deterministisistä luvuista (@react-pdf).
+          PDF käyttää samaa determinististä moottoria kuin vaihe 9. Lataus ajaa
+          laskennan uudelleen juuri ennen generointia.
         </p>
         <div className="mt-4">
           <DownloadTilinpaatosPdf
             yritys={yritys}
             reititys={reititys}
-            laskelma={laskelma}
+            laskelma={fresh}
             liitetiedot={liitetiedot}
             hyvaksynta={h}
+            refreshLaskelma={() => {
+              run();
+              return useWizardStore.getState().laskelma;
+            }}
             onGenerated={() => patch({ pdfValmis: true })}
           />
         </div>
@@ -111,7 +122,7 @@ export function Step11Hyvaksynta() {
 
       <div className={`${cardRow} print:border-black`}>
         <h3 className="text-sm font-semibold text-[var(--fg)]">
-          Esikatselu (HTML)
+          Esikatselu (moottorin luvut)
         </h3>
         <div className="mt-4 space-y-1 text-sm">
           <p className="text-lg font-semibold text-[var(--fg)]">
@@ -135,6 +146,10 @@ export function Step11Hyvaksynta() {
                 <span className="tabular-nums">{formatEuro(t.liikevaihto)}</span>
               </li>
               <li className="flex justify-between">
+                <span>Liiketulos</span>
+                <span className="tabular-nums">{formatEuro(t.liiketulos)}</span>
+              </li>
+              <li className="flex justify-between">
                 <span>Tilikauden tulos</span>
                 <span className="tabular-nums font-semibold">
                   {formatEuro(t.tilikaudenTulos)}
@@ -147,6 +162,12 @@ export function Step11Hyvaksynta() {
               Tase
             </h4>
             <ul className="mt-2 space-y-1 text-sm">
+              <li className="flex justify-between">
+                <span>Rahat ja pankit</span>
+                <span className="tabular-nums">
+                  {formatEuro(bs.rahatJaPankkisaamiset)}
+                </span>
+              </li>
               <li className="flex justify-between">
                 <span>Vastaavaa</span>
                 <span className="tabular-nums">

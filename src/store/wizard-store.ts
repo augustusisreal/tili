@@ -1,7 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { ajaLaskentamoottori, mapita6B } from "@/lib/accounting";
+import {
+  ajaLaskentamoottori,
+  buildLaskentaInputFromWizard,
+  mapita6B,
+} from "@/lib/accounting";
 import { todayIso } from "@/lib/format";
 import type {
   Hyvaksynta,
@@ -326,20 +330,13 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
   runEngine: () => {
     const s = get();
-    const laskelma = ajaLaskentamoottori({
-      nollatoiminta: s.reititys.onNollatoiminta === true || s.kirjanpito.nollatoiminta,
-      onVarastoa: s.reititys.onVarastoa === true,
-      kirjanpito: s.kirjanpito,
-      kayttoomaisuus: s.kayttoomaisuus,
-      poistoProsentti: s.poistoProsentti,
-      saamisetVelat: s.saamisetVelat,
-      pankit: s.pankit,
-      omaPaaoma: s.omaPaaoma,
-      verot: s.verot,
-    });
+    const laskelma = ajaLaskentamoottori(buildLaskentaInputFromWizard(s));
     set({
       laskelma,
-      omaPaaoma: { ...s.omaPaaoma, tilikaudenTulos: laskelma.kuluva.tilikaudenTulos },
+      omaPaaoma: {
+        ...s.omaPaaoma,
+        tilikaudenTulos: laskelma.kuluva.tilikaudenTulos,
+      },
     });
     get().setStepStatus(8, "valmis");
   },
