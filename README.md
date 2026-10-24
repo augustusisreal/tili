@@ -18,6 +18,8 @@ Avaa [http://localhost:3000](http://localhost:3000).
 - PRH Y-tunnus -haku (`/api/prh/[ytunnus]`)
 - Tumma / vaalea Linear–Stripe-tyylinen UI
 - 6B-kenttäkartoitus + kopiointi
+- Tilinpäätös-PDF (`@react-pdf/renderer`: kansilehti, tulos, tase, allekirjoitukset)
+- Drag & drop -tiedostolataus (pääkirja, tiliotteet, kuitit) selaimen muistiin
 
 ## Skriptit
 

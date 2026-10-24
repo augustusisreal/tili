@@ -17,11 +17,14 @@ import type {
   StepStatus,
   ThemeMode,
   Toimitus,
+  UploadCategory,
+  UploadedFileMeta,
   VerotAlvPalkat,
   WizardState,
   Yritys,
 } from "@/lib/types";
 import { STEP_COUNT } from "@/lib/types";
+import { fileToUploadedMeta } from "@/lib/uploads";
 
 function emptyStatuses(): StepStatus[] {
   return Array.from({ length: STEP_COUNT }, () => "ei_aloitettu");
@@ -160,6 +163,9 @@ interface WizardActions {
   setLomake6B: (rows: Kentta6B[]) => void;
   build6B: () => void;
   patchToimitus: (p: Partial<Toimitus>) => void;
+  addUploadedFiles: (category: UploadCategory, files: File[]) => Promise<string | null>;
+  removeUploadedFile: (id: string) => void;
+  filesByCategory: (category: UploadCategory) => UploadedFileMeta[];
   setPrhLataa: (v: boolean) => void;
   setPrhVirhe: (v: string | null) => void;
   getReitti: () => Reitti | null;
@@ -194,6 +200,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
   hyvaksynta: initialHyvaksynta,
   lomake6B: [],
   toimitus: initialToimitus,
+  uploadedFiles: [],
   prhLataa: false,
   prhVirhe: null,
 
@@ -360,6 +367,60 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
     set((s) => ({ toimitus: { ...s.toimitus, ...p } }));
     get().markCollecting(12);
   },
+
+  addUploadedFiles: async (category, files) => {
+    try {
+      const metas: UploadedFileMeta[] = [];
+      for (const f of files) {
+        metas.push(await fileToUploadedMeta(f, category));
+      }
+      set((s) => ({ uploadedFiles: [...s.uploadedFiles, ...metas] }));
+
+      // Synkkaa kirjanpito-/latausliput
+      if (category === "paakirja") {
+        get().patchKirjanpito({ paakirjaLadattu: true });
+      } else if (category === "tuloslaskelma") {
+        get().patchKirjanpito({ tuloslaskelmaLadattu: true });
+      } else if (category === "tase") {
+        get().patchKirjanpito({ taseLadattu: true });
+      } else if (category === "edellinen_tp") {
+        get().patchKirjanpito({ edellinenTpLadattu: true });
+      } else if (category === "tiliote" || category === "kuitti") {
+        get().markCollecting(3);
+      }
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Tiedoston lataus epäonnistui.";
+    }
+  },
+
+  removeUploadedFile: (id) => {
+    set((s) => {
+      const removed = s.uploadedFiles.find((f) => f.id === id);
+      const uploadedFiles = s.uploadedFiles.filter((f) => f.id !== id);
+      const kirjanpito = { ...s.kirjanpito };
+      if (removed) {
+        const still = (c: UploadCategory) =>
+          uploadedFiles.some((f) => f.category === c);
+        if (removed.category === "paakirja" && !still("paakirja")) {
+          kirjanpito.paakirjaLadattu = false;
+        }
+        if (removed.category === "tuloslaskelma" && !still("tuloslaskelma")) {
+          kirjanpito.tuloslaskelmaLadattu = false;
+        }
+        if (removed.category === "tase" && !still("tase")) {
+          kirjanpito.taseLadattu = false;
+        }
+        if (removed.category === "edellinen_tp" && !still("edellinen_tp")) {
+          kirjanpito.edellinenTpLadattu = false;
+        }
+      }
+      return { uploadedFiles, kirjanpito };
+    });
+  },
+
+  filesByCategory: (category) =>
+    get().uploadedFiles.filter((f) => f.category === category),
 
   setPrhLataa: (v) => set({ prhLataa: v }),
   setPrhVirhe: (v) => set({ prhVirhe: v }),
