@@ -27,9 +27,9 @@ export function FileDropZone({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const files = useWizardStore((s) =>
-    s.uploadedFiles.filter((f) => f.category === category),
-  );
+  // Select the stable array ref; filter outside to avoid getSnapshot infinite loop.
+  const uploadedFiles = useWizardStore((s) => s.uploadedFiles);
+  const files = uploadedFiles.filter((f) => f.category === category);
   const addUploadedFiles = useWizardStore((s) => s.addUploadedFiles);
   const removeUploadedFile = useWizardStore((s) => s.removeUploadedFile);
 

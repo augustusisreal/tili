@@ -13,9 +13,9 @@ export function Step04Pankit() {
   const add = useWizardStore((s) => s.addPankki);
   const update = useWizardStore((s) => s.updatePankki);
   const remove = useWizardStore((s) => s.removePankki);
-  const tilioteCount = useWizardStore(
-    (s) => s.uploadedFiles.filter((f) => f.category === "tiliote").length,
-  );
+  const uploadedFiles = useWizardStore((s) => s.uploadedFiles);
+  const tilioteCount = uploadedFiles.filter((f) => f.category === "tiliote")
+    .length;
 
   return (
     <StepChrome

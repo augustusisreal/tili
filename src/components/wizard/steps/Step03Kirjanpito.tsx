@@ -11,14 +11,12 @@ export function Step03Kirjanpito() {
   const reititys = useWizardStore((s) => s.reititys);
   const patch = useWizardStore((s) => s.patchKirjanpito);
   const nolla = reititys.onNollatoiminta === true || kp.nollatoiminta;
-  const uploadedCount = useWizardStore(
-    (s) =>
-      s.uploadedFiles.filter((f) =>
-        ["paakirja", "tuloslaskelma", "tase", "edellinen_tp", "kuitti"].includes(
-          f.category,
-        ),
-      ).length,
-  );
+  const uploadedFiles = useWizardStore((s) => s.uploadedFiles);
+  const uploadedCount = uploadedFiles.filter((f) =>
+    ["paakirja", "tuloslaskelma", "tase", "edellinen_tp", "kuitti"].includes(
+      f.category,
+    ),
+  ).length;
 
   return (
     <StepChrome
