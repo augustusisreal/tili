@@ -24,6 +24,7 @@ import type {
   Yritys,
 } from "@/lib/types";
 import { STEP_COUNT } from "@/lib/types";
+import type { TilioteExtract } from "@/lib/ai/tiliote-schema";
 import { fileToUploadedMeta } from "@/lib/uploads";
 
 function emptyStatuses(): StepStatus[] {
@@ -166,6 +167,8 @@ interface WizardActions {
   addUploadedFiles: (category: UploadCategory, files: File[]) => Promise<string | null>;
   removeUploadedFile: (id: string) => void;
   filesByCategory: (category: UploadCategory) => UploadedFileMeta[];
+  /** Täyttää pankkitilin AI-poiminnan perusteella (IBAN + loppusaldo). */
+  applyTilioteExtract: (data: TilioteExtract) => void;
   setPrhLataa: (v: boolean) => void;
   setPrhVirhe: (v: string | null) => void;
   getReitti: () => Reitti | null;
@@ -421,6 +424,58 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
   filesByCategory: (category) =>
     get().uploadedFiles.filter((f) => f.category === category),
+
+  applyTilioteExtract: (data) => {
+    const iban = (data.iban || "").replace(/\s+/g, "").toUpperCase();
+    const saldo = Number.isFinite(data.loppusaldo) ? data.loppusaldo : 0;
+    const nimi = data.tilinNimi?.trim() || "";
+
+    set((s) => {
+      const pankit = [...s.pankit];
+      const norm = (v: string) => v.replace(/\s+/g, "").toUpperCase();
+
+      const byIban =
+        iban.length > 0
+          ? pankit.findIndex((p) => norm(p.iban) === iban)
+          : -1;
+
+      if (byIban >= 0) {
+        const cur = pankit[byIban];
+        pankit[byIban] = {
+          ...cur,
+          iban: iban || cur.iban,
+          loppusaldo: saldo,
+          kirjanpidonSaldo: saldo,
+          nimi: nimi || cur.nimi,
+        };
+      } else {
+        const emptyIdx = pankit.findIndex(
+          (p) => !p.iban.trim() && p.loppusaldo === 0 && p.kirjanpidonSaldo === 0,
+        );
+        if (emptyIdx >= 0) {
+          const cur = pankit[emptyIdx];
+          pankit[emptyIdx] = {
+            ...cur,
+            iban,
+            loppusaldo: saldo,
+            kirjanpidonSaldo: saldo,
+            nimi: nimi || cur.nimi || "Käyttötili",
+          };
+        } else {
+          pankit.push({
+            id: uid(),
+            nimi: nimi || "Käyttötili (AI)",
+            iban,
+            loppusaldo: saldo,
+            kirjanpidonSaldo: saldo,
+          });
+        }
+      }
+
+      return { pankit };
+    });
+    get().markCollecting(3);
+  },
 
   setPrhLataa: (v) => set({ prhLataa: v }),
   setPrhVirhe: (v) => set({ prhVirhe: v }),
