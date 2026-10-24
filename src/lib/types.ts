@@ -165,6 +165,26 @@ export interface Toimitus {
   arkistoPolku: string;
 }
 
+/** Selaimessa pidettävä liitetiedosto (odottaa AI-käsittelyä). */
+export type UploadCategory =
+  | "paakirja"
+  | "tuloslaskelma"
+  | "tase"
+  | "edellinen_tp"
+  | "tiliote"
+  | "kuitti";
+
+export interface UploadedFileMeta {
+  id: string;
+  category: UploadCategory;
+  name: string;
+  size: number;
+  mimeType: string;
+  addedAt: string;
+  /** Raaka sisältö muistissa — ei vielä AI-käsitelty. */
+  data: ArrayBuffer;
+}
+
 export interface WizardState {
   theme: ThemeMode;
   activeStep: number;
@@ -183,9 +203,19 @@ export interface WizardState {
   hyvaksynta: Hyvaksynta;
   lomake6B: Kentta6B[];
   toimitus: Toimitus;
+  uploadedFiles: UploadedFileMeta[];
   prhLataa: boolean;
   prhVirhe: string | null;
 }
+
+export const UPLOAD_CATEGORY_LABELS: Record<UploadCategory, string> = {
+  paakirja: "Pääkirja / päiväkirja",
+  tuloslaskelma: "Tuloslaskelma",
+  tase: "Tase",
+  edellinen_tp: "Edellisen vuoden tilinpäätös",
+  tiliote: "Tiliote",
+  kuitti: "Kuitti",
+};
 
 export const STEP_COUNT = 13;
 

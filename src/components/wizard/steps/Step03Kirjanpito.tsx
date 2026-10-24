@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox, Field, MoneyInput } from "@/components/ui/FormFields";
+import { FileDropZone } from "@/components/ui/FileDropZone";
 import { StepChrome } from "@/components/wizard/StepChrome";
 import { cardRow } from "@/lib/ui-classes";
 import { useWizardStore } from "@/store/wizard-store";
@@ -10,13 +11,20 @@ export function Step03Kirjanpito() {
   const reititys = useWizardStore((s) => s.reititys);
   const patch = useWizardStore((s) => s.patchKirjanpito);
   const nolla = reititys.onNollatoiminta === true || kp.nollatoiminta;
+  const uploadedFiles = useWizardStore((s) => s.uploadedFiles);
+  const uploadedCount = uploadedFiles.filter((f) =>
+    ["paakirja", "tuloslaskelma", "tase", "edellinen_tp", "kuitti"].includes(
+      f.category,
+    ),
+  ).length;
 
   return (
     <StepChrome
       checklist={[
         nolla
           ? "0-toiminta: tuloslaskelma voi olla nolla"
-          : "Syötä liikevaihto ja kuluerät (tai merkitse raportit ladatuiksi)",
+          : "Lataa pääkirja / tulos / tase tai syötä luvut käsin",
+        "Tiedostot säilyvät selaimen muistissa (odottaa AI-käsittelyä)",
         "Jatkavalla tilikaudella tarvitaan edellisen vuoden TP",
       ]}
     >
@@ -26,10 +34,55 @@ export function Step03Kirjanpito() {
           onChange={(v) => patch({ nollatoiminta: v })}
           label="0-toiminta — ei liiketoimintaa tilikaudella"
         />
+        <p className="text-xs text-[var(--muted)]">
+          Ladattuja kirjanpitotiedostoja: {uploadedCount}
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className={cardRow}>
+          <h3 className="mb-3 text-sm font-semibold text-[var(--fg)]">
+            Pääkirja / päiväkirja
+          </h3>
+          <FileDropZone category="paakirja" />
+        </div>
+        <div className={cardRow}>
+          <h3 className="mb-3 text-sm font-semibold text-[var(--fg)]">
+            Tuloslaskelma
+          </h3>
+          <FileDropZone category="tuloslaskelma" />
+        </div>
+        <div className={cardRow}>
+          <h3 className="mb-3 text-sm font-semibold text-[var(--fg)]">Tase</h3>
+          <FileDropZone category="tase" />
+        </div>
+        <div className={cardRow}>
+          <h3 className="mb-3 text-sm font-semibold text-[var(--fg)]">
+            Kuitit (valinnainen)
+          </h3>
+          <FileDropZone
+            category="kuitti"
+            hint="Kuitit, tositteet — odottaa AI-käsittelyä"
+          />
+        </div>
+        {reititys.onEnsimmainenTilikausi === false ? (
+          <div className={`${cardRow} lg:col-span-2`}>
+            <h3 className="mb-3 text-sm font-semibold text-[var(--fg)]">
+              Edellisen vuoden vahvistettu tilinpäätös
+            </h3>
+            <FileDropZone category="edellinen_tp" />
+          </div>
+        ) : null}
+      </div>
+
+      <div className={`${cardRow} space-y-2`}>
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          Lataustila (automaattinen)
+        </p>
         <Checkbox
           checked={kp.paakirjaLadattu}
           onChange={(v) => patch({ paakirjaLadattu: v })}
-          label="Pääkirja / päiväkirja käsitelty (stub: ei tiedostolatausta)"
+          label="Pääkirja käsitelty"
         />
         <Checkbox
           checked={kp.tuloslaskelmaLadattu}
@@ -45,7 +98,7 @@ export function Step03Kirjanpito() {
           <Checkbox
             checked={kp.edellinenTpLadattu}
             onChange={(v) => patch({ edellinenTpLadattu: v })}
-            label="Edellisen vuoden vahvistettu tilinpäätös vertailuun"
+            label="Edellisen vuoden TP vertailuun"
           />
         ) : null}
       </div>

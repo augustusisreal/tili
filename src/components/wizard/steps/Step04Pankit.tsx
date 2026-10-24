@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { Field, MoneyInput, TextInput } from "@/components/ui/FormFields";
+import { FileDropZone } from "@/components/ui/FileDropZone";
 import { StepChrome } from "@/components/wizard/StepChrome";
 import { formatEuro } from "@/lib/format";
 import { btnGhost, btnSoft, cardRow } from "@/lib/ui-classes";
@@ -12,15 +13,31 @@ export function Step04Pankit() {
   const add = useWizardStore((s) => s.addPankki);
   const update = useWizardStore((s) => s.updatePankki);
   const remove = useWizardStore((s) => s.removePankki);
+  const uploadedFiles = useWizardStore((s) => s.uploadedFiles);
+  const tilioteCount = uploadedFiles.filter((f) => f.category === "tiliote")
+    .length;
 
   return (
     <StepChrome
       checklist={[
+        "Lataa tiliotteet (drag & drop) — säilytetään muistissa AI:lle",
         "Syötä IBAN ja tilikauden loppusaldo",
         "Täsmäytä kirjanpidon pankkitiliin",
-        "Erotus näkyy validointipalkissa laskennan jälkeen",
       ]}
     >
+      <div className={cardRow}>
+        <h3 className="mb-1 text-sm font-semibold text-[var(--fg)]">
+          Tiliotteet
+        </h3>
+        <p className="mb-3 text-xs text-[var(--muted)]">
+          Vedä pankin tiliotteet tähän. {tilioteCount} tiedostoa muistissa.
+        </p>
+        <FileDropZone
+          category="tiliote"
+          hint="PDF / CSV / MT940 — max 25 Mt · odottaa AI-käsittelyä"
+        />
+      </div>
+
       <div className="flex justify-end">
         <button type="button" className={btnSoft} onClick={add}>
           <Plus className="size-4" />

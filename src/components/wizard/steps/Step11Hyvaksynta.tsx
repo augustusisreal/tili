@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { FileText } from "lucide-react";
 import { Checkbox, Field, TextInput } from "@/components/ui/FormFields";
 import { StepChrome } from "@/components/wizard/StepChrome";
@@ -7,12 +8,26 @@ import { formatEuro, todayIso } from "@/lib/format";
 import { cardRow } from "@/lib/ui-classes";
 import { useWizardStore } from "@/store/wizard-store";
 
+const DownloadTilinpaatosPdf = dynamic(
+  () =>
+    import("@/components/pdf/DownloadTilinpaatosPdf").then(
+      (m) => m.DownloadTilinpaatosPdf,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-[var(--muted)]">Ladataan PDF-moottoria…</p>
+    ),
+  },
+);
+
 export function Step11Hyvaksynta() {
   const h = useWizardStore((s) => s.hyvaksynta);
   const patch = useWizardStore((s) => s.patchHyvaksynta);
   const laskelma = useWizardStore((s) => s.laskelma);
   const yritys = useWizardStore((s) => s.yritys);
   const reititys = useWizardStore((s) => s.reititys);
+  const liitetiedot = useWizardStore((s) => s.liitetiedot);
   const run = useWizardStore((s) => s.runEngine);
 
   if (!laskelma) {
@@ -40,7 +55,7 @@ export function Step11Hyvaksynta() {
       checklist={[
         "Ristiintarkistus: tulos ↔ tase ↔ 6B",
         "Allekirjoitus ja hyväksyntä",
-        "Tulostusvalmis TP-näkymä (HTML, ei PDF-generaattoria)",
+        "Lataa virallinen tilinpäätös-PDF (kansilehti, tulos, tase, allekirjoitukset)",
       ]}
     >
       <div className={`${cardRow} space-y-3`}>
@@ -64,7 +79,7 @@ export function Step11Hyvaksynta() {
         <Checkbox
           checked={h.pdfValmis}
           onChange={(v) => patch({ pdfValmis: v })}
-          label="Tulostusvalmis näkymä tarkistettu"
+          label="PDF tarkistettu / ladattu"
         />
         <Field label="Hyväksyjä">
           <TextInput
@@ -74,13 +89,30 @@ export function Step11Hyvaksynta() {
         </Field>
       </div>
 
-      <div className={`${cardRow} print:border-black`}>
+      <div className={cardRow}>
         <div className="flex items-center gap-2 text-[var(--accent)]">
           <FileText className="size-4" />
-          <h3 className="text-sm font-semibold">
-            Tilinpäätös — tulostusnäkymä
-          </h3>
+          <h3 className="text-sm font-semibold">Tilinpäätös-PDF</h3>
         </div>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Muodostetaan wizard-tilan deterministisistä luvuista (@react-pdf).
+        </p>
+        <div className="mt-4">
+          <DownloadTilinpaatosPdf
+            yritys={yritys}
+            reititys={reititys}
+            laskelma={laskelma}
+            liitetiedot={liitetiedot}
+            hyvaksynta={h}
+            onGenerated={() => patch({ pdfValmis: true })}
+          />
+        </div>
+      </div>
+
+      <div className={`${cardRow} print:border-black`}>
+        <h3 className="text-sm font-semibold text-[var(--fg)]">
+          Esikatselu (HTML)
+        </h3>
         <div className="mt-4 space-y-1 text-sm">
           <p className="text-lg font-semibold text-[var(--fg)]">
             {yritys.nimi || "—"}
@@ -130,10 +162,6 @@ export function Step11Hyvaksynta() {
             </ul>
           </div>
         </div>
-        <p className="mt-6 text-xs text-[var(--muted)]">
-          Stub: oikea PDF-vienti (esim. @react-pdf) voidaan lisätä myöhemmin.
-          Käytä selaimen Tulosta → PDF.
-        </p>
       </div>
     </StepChrome>
   );
