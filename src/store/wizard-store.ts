@@ -12,6 +12,7 @@ import type {
   Kayttoomaisuuserä,
   Kentta6B,
   KirjanpitoRaportit,
+  LaskelmaTulos,
   Liitetiedot,
   OmaPaaoma,
   Pankkitili,
@@ -162,7 +163,7 @@ interface WizardActions {
   setPoistoProsentti: (n: number) => void;
   patchVerot: (p: Partial<VerotAlvPalkat>) => void;
   patchOmaPaaoma: (p: Partial<OmaPaaoma>) => void;
-  runEngine: () => void;
+  runEngine: () => LaskelmaTulos;
   patchLiitetiedot: (p: Partial<Liitetiedot>) => void;
   patchHyvaksynta: (p: Partial<Hyvaksynta>) => void;
   setLomake6B: (rows: Kentta6B[]) => void;
@@ -339,6 +340,7 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
       },
     });
     get().setStepStatus(8, "valmis");
+    return laskelma;
   },
 
   patchLiitetiedot: (p) => {
@@ -471,7 +473,9 @@ export const useWizardStore = create<WizardStore>((set, get) => ({
 
       return { pankit };
     });
-    get().markCollecting(3);
+    // AI-poiminta → pankkikentät syöttävät moottorille (vaihe 9) rahatJaPankkisaamiset.
+    get().setStepStatus(3, "valmis");
+    get().markCollecting(8);
   },
 
   setPrhLataa: (v) => set({ prhLataa: v }),

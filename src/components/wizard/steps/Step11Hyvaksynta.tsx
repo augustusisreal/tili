@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { FileText } from "lucide-react";
 import { Checkbox, Field, TextInput } from "@/components/ui/FormFields";
@@ -28,24 +28,32 @@ export function Step11Hyvaksynta() {
   const yritys = useWizardStore((s) => s.yritys);
   const reititys = useWizardStore((s) => s.reititys);
   const liitetiedot = useWizardStore((s) => s.liitetiedot);
+  const pankit = useWizardStore((s) => s.pankit);
   const run = useWizardStore((s) => s.runEngine);
-  const fresh = useWizardStore((s) => s.laskelma);
+  const laskelma = useWizardStore((s) => s.laskelma);
 
-  // Varmista tuore moottorilaskelma kun vaihe avataan.
+  const pankkiYhteensa = useMemo(
+    () => pankit.reduce((s, p) => s + p.loppusaldo, 0),
+    [pankit],
+  );
+
+  // Aja moottori heti — käyttää mm. AI-täytettyjä pankkisaldoja Zustandista.
   useEffect(() => {
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount / when banks change
+  }, [pankkiYhteensa]);
+
+  const fresh = laskelma;
   if (!fresh) {
     return (
       <StepChrome>
         <p className="text-sm text-[var(--muted)]">
-          Aja ensin laskentamoottori (vaihe 9).
+          Laskentaa ajetaan wizard-tilasta…
         </p>
         <button
           type="button"
-          className="text-sm font-medium text-[var(--accent)] hover:underline"
-          onClick={run}
+          className="mt-3 text-sm font-medium text-[var(--accent)] hover:underline"
+          onClick={() => run()}
         >
           Aja laskenta nyt
         </button>
@@ -61,9 +69,38 @@ export function Step11Hyvaksynta() {
       checklist={[
         "Ristiintarkistus: tulos ↔ tase (Vastaavaa = Vastattavaa)",
         "Allekirjoitus ja hyväksyntä",
-        "Lataa PDF moottorin luvuilla (kansilehti, tulos, tase, allekirjoitukset)",
+        "Lataa Tilinpäätös PDF moottorin luvuilla",
       ]}
     >
+      {/* Prominent PDF CTA first */}
+      <div
+        className={`${cardRow} border-[var(--accent)]/40 bg-[var(--accent-soft)]/40`}
+      >
+        <div className="flex items-center gap-2 text-[var(--accent)]">
+          <FileText className="size-5" />
+          <h3 className="text-base font-semibold text-[var(--fg)]">
+            Lataa Tilinpäätös PDF
+          </h3>
+        </div>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Muodostaa virallisen PMA-tilinpäätöksen (kansilehti, tuloslaskelma,
+          tase, allekirjoitukset) juuri lasketuista Zustand-luvuista — sisältää
+          AI-poimitun pankkisaldon ({formatEuro(pankkiYhteensa)}).
+        </p>
+        <div className="mt-4">
+          <DownloadTilinpaatosPdf
+            yritys={yritys}
+            reititys={reititys}
+            laskelma={fresh}
+            liitetiedot={liitetiedot}
+            hyvaksynta={h}
+            pankkiYhteensa={pankkiYhteensa}
+            refreshLaskelma={() => run()}
+            onGenerated={() => patch({ pdfValmis: true })}
+          />
+        </div>
+      </div>
+
       <div className={`${cardRow} space-y-3`}>
         <Checkbox
           checked={h.ristiintarkistusOk}
@@ -95,31 +132,6 @@ export function Step11Hyvaksynta() {
         </Field>
       </div>
 
-      <div className={cardRow}>
-        <div className="flex items-center gap-2 text-[var(--accent)]">
-          <FileText className="size-4" />
-          <h3 className="text-sm font-semibold">Tilinpäätös-PDF</h3>
-        </div>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          PDF käyttää samaa determinististä moottoria kuin vaihe 9. Lataus ajaa
-          laskennan uudelleen juuri ennen generointia.
-        </p>
-        <div className="mt-4">
-          <DownloadTilinpaatosPdf
-            yritys={yritys}
-            reititys={reititys}
-            laskelma={fresh}
-            liitetiedot={liitetiedot}
-            hyvaksynta={h}
-            refreshLaskelma={() => {
-              run();
-              return useWizardStore.getState().laskelma;
-            }}
-            onGenerated={() => patch({ pdfValmis: true })}
-          />
-        </div>
-      </div>
-
       <div className={`${cardRow} print:border-black`}>
         <h3 className="text-sm font-semibold text-[var(--fg)]">
           Esikatselu (moottorin luvut)
@@ -146,10 +158,6 @@ export function Step11Hyvaksynta() {
                 <span className="tabular-nums">{formatEuro(t.liikevaihto)}</span>
               </li>
               <li className="flex justify-between">
-                <span>Liiketulos</span>
-                <span className="tabular-nums">{formatEuro(t.liiketulos)}</span>
-              </li>
-              <li className="flex justify-between">
                 <span>Tilikauden tulos</span>
                 <span className="tabular-nums font-semibold">
                   {formatEuro(t.tilikaudenTulos)}
@@ -164,7 +172,7 @@ export function Step11Hyvaksynta() {
             <ul className="mt-2 space-y-1 text-sm">
               <li className="flex justify-between">
                 <span>Rahat ja pankit</span>
-                <span className="tabular-nums">
+                <span className="tabular-nums font-semibold text-[var(--accent)]">
                   {formatEuro(bs.rahatJaPankkisaamiset)}
                 </span>
               </li>

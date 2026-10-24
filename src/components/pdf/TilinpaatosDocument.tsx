@@ -16,11 +16,19 @@ import type {
   Yritys,
 } from "@/lib/types";
 
+function dejaVuSrc(file: string): string {
+  // Browser: public URL. Node/smoke (no window): absolute path under repo.
+  if (typeof window === "undefined") {
+    return `${process.cwd()}/public/fonts/${file}`;
+  }
+  return `/fonts/${file}`;
+}
+
 Font.register({
   family: "DejaVuSans",
   fonts: [
-    { src: "/fonts/DejaVuSans.ttf", fontWeight: 400 },
-    { src: "/fonts/DejaVuSans-Bold.ttf", fontWeight: 700 },
+    { src: dejaVuSrc("DejaVuSans.ttf"), fontWeight: 400 },
+    { src: dejaVuSrc("DejaVuSans-Bold.ttf"), fontWeight: 700 },
   ],
 });
 
