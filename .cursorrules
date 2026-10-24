@@ -1,0 +1,1 @@
+Kaikki kirjanpidon ja taseen laskenta on oltava 100 % determinististä TypeScript-koodia (ei LLM-arvauksia luvuille). Käyttöliittymä on aina selkeää suomen kieltä. Noudatamme Suomen Kirjanpitolakia (KPL), PMA-asetusta (mikroyrityksen suojasatama) ja Verohallinnon 6B-lomakkeen rakennetta.
