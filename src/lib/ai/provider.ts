@@ -20,7 +20,7 @@ export function resolveAiProvider(): {
     process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
     process.env.GEMINI_API_KEY?.trim();
   if (googleKey) {
-    const modelId = process.env.GOOGLE_MODEL?.trim() || "gemini-2.0-flash";
+    const modelId = process.env.GOOGLE_MODEL?.trim() || "gemini-2.5-flash";
     const google = createGoogleGenerativeAI({ apiKey: googleKey });
     return { model: google(modelId), provider: "google", modelId };
   }
