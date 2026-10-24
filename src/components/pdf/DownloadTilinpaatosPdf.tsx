@@ -8,17 +8,20 @@ import {
   type TilinpaatosPdfProps,
 } from "@/components/pdf/TilinpaatosDocument";
 import type { LaskelmaTulos } from "@/lib/types";
-import { btnPrimary } from "@/lib/ui-classes";
+import { btnCta } from "@/lib/ui-classes";
 
 type Props = TilinpaatosPdfProps & {
   onGenerated?: () => void;
   /** Aja laskentamoottori juuri ennen PDF:ää — palauttaa tuoreen laskelman. */
   refreshLaskelma?: () => LaskelmaTulos | null;
+  /** Näytä pankkisaldo CTA:n alla (esim. AI-poimittu 15432). */
+  pankkiYhteensa?: number;
 };
 
 export function DownloadTilinpaatosPdf({
   onGenerated,
   refreshLaskelma,
+  pankkiYhteensa,
   ...docProps
 }: Props) {
   const [busy, setBusy] = useState(false);
@@ -38,8 +41,10 @@ export function DownloadTilinpaatosPdf({
         throw new Error("Laskelma puuttuu — aja vaihe 9 ensin.");
       }
       if (
-        Math.abs(fresh.taseKuluva.vastaavaaYhteensa - fresh.taseKuluva.vastattavaaYhteensa) >=
-        0.005
+        Math.abs(
+          fresh.taseKuluva.vastaavaaYhteensa -
+            fresh.taseKuluva.vastattavaaYhteensa,
+        ) >= 0.005
       ) {
         throw new Error("Tase ei ole tasapainossa — PDF:ää ei muodosteta.");
       }
@@ -71,29 +76,44 @@ export function DownloadTilinpaatosPdf({
   if (!ready) return null;
 
   const bs = docProps.laskelma.taseKuluva;
+  const pankit =
+    pankkiYhteensa ?? bs.rahatJaPankkisaamiset;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <button
         type="button"
-        className={btnPrimary}
+        className={btnCta}
         disabled={busy}
         onClick={() => void handleDownload()}
       >
         {busy ? (
-          <Loader2 className="size-4 animate-spin" />
+          <Loader2 className="size-5 animate-spin" />
         ) : (
-          <Download className="size-4" />
+          <Download className="size-5" />
         )}
-        {busy ? "Muodostetaan PDF…" : "Lataa tilinpäätös-PDF"}
+        {busy ? "Muodostetaan PDF…" : "Lataa Tilinpäätös PDF"}
       </button>
       {error ? (
         <p className="text-xs text-[var(--status-yellow)]">{error}</p>
       ) : (
-        <p className="text-xs text-[var(--muted)]">
+        <p className="text-sm text-[var(--muted)]">
           Kansilehti · Tuloslaskelma · Tase · Allekirjoitukset — moottorin
-          luvuista (Vastaavaa {bs.vastaavaaYhteensa.toFixed(2)} € =
-          Vastattavaa {bs.vastattavaaYhteensa.toFixed(2)} €).
+          luvuista. Rahat ja pankit{" "}
+          <strong className="text-[var(--fg)]">
+            {pankit.toLocaleString("fi-FI", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{" "}
+            €
+          </strong>
+          {" · "}
+          Vastaavaa = Vastattavaa{" "}
+          {bs.vastaavaaYhteensa.toLocaleString("fi-FI", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}{" "}
+          €
         </p>
       )}
     </div>

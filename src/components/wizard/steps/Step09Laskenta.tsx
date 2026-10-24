@@ -26,8 +26,8 @@ export function Step09Laskenta() {
           Aja laskentamoottori
         </button>
         <span className="text-xs text-[var(--muted)]">
-          Lukee kirjanpidon, pankit, saamiset/velat, poistot, verot ja oman
-          pääoman.
+          Lukee vaiheet 3–8 Zustandista (myös AI-poimitut pankkisaldot) → PMA
+          tulos + tase.
         </span>
       </div>
 

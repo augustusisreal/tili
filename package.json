@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx --yes tsx src/lib/accounting.selftest.ts"
+    "test": "npx --yes tsx src/lib/accounting.selftest.ts",
+    "test:e2e-pdf": "node scripts/e2e-pdf-smoke.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.104",
