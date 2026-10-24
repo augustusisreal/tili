@@ -13,6 +13,7 @@ export function Step04Pankit() {
   const add = useWizardStore((s) => s.addPankki);
   const update = useWizardStore((s) => s.updatePankki);
   const remove = useWizardStore((s) => s.removePankki);
+  const applyTilioteExtract = useWizardStore((s) => s.applyTilioteExtract);
   const uploadedFiles = useWizardStore((s) => s.uploadedFiles);
   const tilioteCount = uploadedFiles.filter((f) => f.category === "tiliote")
     .length;
@@ -20,8 +21,8 @@ export function Step04Pankit() {
   return (
     <StepChrome
       checklist={[
-        "Lataa tiliotteet (drag & drop) — säilytetään muistissa AI:lle",
-        "Syötä IBAN ja tilikauden loppusaldo",
+        "Lataa tiliote (PDF) — AI poimii IBAN + 31.12. loppusaldon",
+        "Tarkista automaattitäytetyt kentät",
         "Täsmäytä kirjanpidon pankkitiliin",
       ]}
     >
@@ -30,11 +31,14 @@ export function Step04Pankit() {
           Tiliotteet
         </h3>
         <p className="mb-3 text-xs text-[var(--muted)]">
-          Vedä pankin tiliotteet tähän. {tilioteCount} tiedostoa muistissa.
+          Vedä pankin tiliote tähän. AI täyttää IBAN- ja saldokentät.{" "}
+          {tilioteCount} tiedostoa muistissa.
         </p>
         <FileDropZone
           category="tiliote"
-          hint="PDF / CSV / MT940 — max 25 Mt · odottaa AI-käsittelyä"
+          enableAiParse
+          hint="PDF / CSV / TXT — max 25 Mt · AI: IBAN + päätössaldo"
+          onAiParsed={(data) => applyTilioteExtract(data)}
         />
       </div>
 

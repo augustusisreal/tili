@@ -20,6 +20,14 @@ Avaa [http://localhost:3000](http://localhost:3000).
 - 6B-kenttäkartoitus + kopiointi
 - Tilinpäätös-PDF (`@react-pdf/renderer`: kansilehti, tulos, tase, allekirjoitukset)
 - Drag & drop -tiedostolataus (pääkirja, tiliotteet, kuitit) selaimen muistiin
+- AI-tiliotteen parsinta (`/api/parse-document`) — IBAN + 31.12. loppusaldo → pankkikentät
+
+### AI-ympäristömuuttujat
+
+Kopioi `.env.example` → `.env.local` ja aseta vähintään yksi:
+
+- `OPENAI_API_KEY` (oletusmalli `gpt-4o-mini`)
+- tai `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_API_KEY` (oletus `gemini-2.0-flash`)
 
 ## Skriptit
 

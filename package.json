@@ -10,16 +10,22 @@
     "test": "npx --yes tsx src/lib/accounting.selftest.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.104",
+    "@ai-sdk/openai": "^4.0.101",
     "@react-pdf/renderer": "^4.9.0",
+    "ai": "^7.0.152",
     "lucide-react": "^1.61.0",
     "next": "16.4.3",
+    "pdf-parse": "^2.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "zod": "^4.6.7",
     "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
